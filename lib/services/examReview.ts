@@ -1,6 +1,6 @@
 import * as reviewRepo from '@/lib/repositories/examReview'
 import { findUserById } from '@/lib/repositories/user'
-import { syncExamReviewAggregateFromReviews } from '@/lib/examAnalysis'
+import { syncExamReviewAggregateFromReviews } from '@/lib/services/examAnalysis'
 import { NotFoundError, ForbiddenError, ValidationError } from '@/lib/services/errors'
 import type { ExamReviewKey, UpdateExamReviewData } from '@/lib/repositories/examReview'
 

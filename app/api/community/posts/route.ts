@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { canAccessStudentCommunity } from '@/lib/communityAccess'
 import { getCommunityFeed, createCommunityPost } from '@/lib/services/community'
-import { NotFoundError, ForbiddenError, ValidationError } from '@/lib/services/errors'
+import { NotFoundError, ForbiddenError, ValidationError, httpStatusFromError } from '@/lib/services/errors'
 import type { CommunityCategory } from '@/types/communityCategory'
 
 const CATEGORIES: CommunityCategory[] = ['QA', 'STUDY_TIP', 'STUDY_PROOF']
@@ -74,9 +74,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ post })
   } catch (e) {
-    if (e instanceof NotFoundError) return NextResponse.json({ error: e.message }, { status: 404 })
-    if (e instanceof ForbiddenError) return NextResponse.json({ error: e.message }, { status: 403 })
-    if (e instanceof ValidationError) return NextResponse.json({ error: e.message }, { status: 400 })
+    if (e instanceof NotFoundError || e instanceof ForbiddenError || e instanceof ValidationError) {
+      return NextResponse.json({ error: e.message }, { status: httpStatusFromError(e) })
+    }
     console.error('POST /api/community/posts 에러:', e)
     return NextResponse.json({ error: '서버 오류가 발생했습니다.' }, { status: 500 })
   }

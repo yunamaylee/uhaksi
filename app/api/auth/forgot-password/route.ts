@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sendPasswordResetEmail } from '@/lib/services/user'
-import { MailDeliveryError } from '@/lib/services/errors'
+import { MailDeliveryError, httpStatusFromError } from '@/lib/services/errors'
 
 const GENERIC_MESSAGE = '입력하신 이메일로 안내가 필요하면 메일을 보냈어요. 받은편지함을 확인해주세요.'
 
@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: GENERIC_MESSAGE })
   } catch (e) {
     if (e instanceof MailDeliveryError) {
-      return NextResponse.json({ error: e.message }, { status: 500 })
+      return NextResponse.json({ error: e.message }, { status: httpStatusFromError(e) })
     }
     console.error('POST /api/auth/forgot-password 에러:', e)
     return NextResponse.json({ error: '서버 오류가 발생했습니다.' }, { status: 500 })

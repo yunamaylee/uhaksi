@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { findLoginId } from '@/lib/services/user'
-import { NotFoundError } from '@/lib/services/errors'
+import { NotFoundError, httpStatusFromError } from '@/lib/services/errors'
 
 export async function POST(request: NextRequest) {
   try {
@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true, loginId })
   } catch (e) {
     if (e instanceof NotFoundError) {
-      return NextResponse.json({ error: e.message }, { status: 404 })
+      return NextResponse.json({ error: e.message }, { status: httpStatusFromError(e) })
     }
     console.error('POST /api/auth/find-email 에러:', e)
     return NextResponse.json({ error: '서버 오류가 발생했습니다.' }, { status: 500 })
