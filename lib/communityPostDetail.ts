@@ -1,7 +1,7 @@
 import type { Session } from 'next-auth'
-import { prisma } from '@/lib/prisma'
 import { canAccessStudentCommunity } from '@/lib/communityAccess'
 import { communityAuthorSchool } from '@/lib/communityDisplay'
+import { findPostDetailById } from '@/lib/repositories/community'
 import type { CommunityCategory } from '@/types/communityCategory'
 
 export type CommunityCommentDetail = {
@@ -46,30 +46,7 @@ export async function getCommunityPostDetail(
 
   const uid = sessionUserId(session)
 
-  const row = await prisma.studentCommunityPost.findUnique({
-    where: { id: postId },
-    select: {
-      id: true,
-      category: true,
-      title: true,
-      body: true,
-      imageData: true,
-      createdAt: true,
-      userId: true,
-      user: { select: { isAdmin: true, verifiedSchoolName: true } },
-      comments: {
-        orderBy: { createdAt: 'asc' },
-        take: 200,
-        select: {
-          id: true,
-          body: true,
-          createdAt: true,
-          userId: true,
-          user: { select: { isAdmin: true, verifiedSchoolName: true } },
-        },
-      },
-    },
-  })
+  const row = await findPostDetailById(postId)
 
   if (!row) {
     return { ok: false, code: 'NOT_FOUND' }

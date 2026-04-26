@@ -1,8 +1,6 @@
 'use client'
 
-/* eslint-disable react-hooks/set-state-in-effect */
-
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import ExamAnalysisPanel from '@/components/ExamAnalysisPanel'
@@ -11,13 +9,7 @@ import Button from '@/components/ui/Button'
 import Chip from '@/components/ui/Chip'
 import Card from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
-
-type ExamPeriod = {
-  name: string
-  dates: string[]
-  startDate: string
-  endDate: string
-}
+import { useSchedule } from '@/hooks/useSchedule'
 
 type Props = {
   schoolId: number
@@ -26,34 +18,12 @@ type Props = {
 export default function ExamCommunityPanel({ schoolId }: Props) {
   const router = useRouter()
   const { status } = useSession()
-  const isAuthed = status === 'authenticated'
-
-  const [loadingExams, setLoadingExams] = useState(true)
-  const [exams, setExams] = useState<ExamPeriod[]>([])
-  const [selectedExamTitle, setSelectedExamTitle] = useState<string | null>(null)
+  const { loadingExams, exams, selectedExamTitle, setSelectedExamTitle } = useSchedule(schoolId)
   const [grade, setGrade] = useState<1 | 2 | 3>(2)
   const [showWrite, setShowWrite] = useState(false)
   const [reviewReloadKey, setReviewReloadKey] = useState(0)
 
-  useEffect(() => {
-    let cancelled = false
-    setLoadingExams(true)
-    fetch(`/api/search/schedule?schoolId=${schoolId}`)
-      .then((r) => r.json())
-      .then((d) => {
-        if (cancelled) return
-        const list = Array.isArray(d) ? (d as ExamPeriod[]) : []
-        setExams(list)
-        setSelectedExamTitle((prev) => prev ?? (list[0]?.name ?? null))
-      })
-      .finally(() => {
-        if (cancelled) return
-        setLoadingExams(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [schoolId])
+  const isAuthed = status === 'authenticated'
 
   const header = useMemo(() => {
     if (loadingExams) return '불러오는 중...'

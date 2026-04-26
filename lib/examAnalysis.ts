@@ -1,13 +1,15 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { prisma } from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
 import { plainifyAndCapAiSummary } from '@/lib/aiSummaryDisplay'
+import { findExamReviewsForAnalysis } from '@/lib/repositories/examReview'
+import {
+  deleteExamReviewAggregatesByKey,
+  upsertExamReviewAggregateData,
+  type ExamAggregateKey,
+  type AiSummaryResult,
+} from '@/lib/repositories/examAnalysisAggregate'
 
-export type ExamAnalysisKey = {
-  schoolId: number
-  examTitle: string
-  grade: number
-}
+export type ExamAnalysisKey = ExamAggregateKey
 
 export type ExamAnalysisStats = {
   reviewCount: number
@@ -30,33 +32,23 @@ function avg(nums: Array<number | null | undefined>): number | null {
 function difficultyHistogram(difficulties: number[]): Record<string, number> {
   const hist: Record<string, number> = { '1': 0, '2': 0, '3': 0, '4': 0, '5': 0 }
   for (const d of difficulties) {
-    const k = String(d)
-    if (hist[k] !== undefined) hist[k]++
+    const key = String(d)
+    if (hist[key] !== undefined) hist[key]++
   }
   return hist
 }
 
 export async function computeExamAnalysisStats(key: ExamAnalysisKey): Promise<{ stats: ExamAnalysisStats; sourceCount: number }> {
-  const rows = await prisma.examReview.findMany({
-    where: { schoolId: key.schoolId, examTitle: key.examTitle, grade: key.grade },
-    orderBy: { createdAt: 'desc' },
-    take: 500,
-    select: {
-      difficulty: true,
-      grammarCount: true,
-      writingCount: true,
-      freeText: true,
-    },
-  })
+  const rows = await findExamReviewsForAnalysis(key, 500)
 
   const diffs = rows.map((r) => r.difficulty)
   const sourceCount = rows.length
 
   const excerpts: string[] = []
   for (const r of rows) {
-    const t = (r.freeText ?? '').trim().replace(/\s+/g, ' ')
-    if (!t) continue
-    const slice = t.length > 140 ? `${t.slice(0, 140)}…` : t
+    const excerpt = (r.freeText ?? '').trim().replace(/\s+/g, ' ')
+    if (!excerpt) continue
+    const slice = excerpt.length > 140 ? `${excerpt.slice(0, 140)}…` : excerpt
     excerpts.push(slice)
     if (excerpts.length >= 12) break
   }
@@ -81,7 +73,7 @@ async function generateSummaryText(opts: {
   apiKey: string
   key: ExamAnalysisKey
   stats: ExamAnalysisStats
-}): Promise<{ text: string; model: string } | null> {
+}): Promise<AiSummaryResult> {
   if (!opts.apiKey) return null
   if (opts.stats.reviewCount < 3) return null
 
@@ -132,17 +124,11 @@ export async function upsertExamReviewAggregate(opts: {
   const { stats, sourceCount } = await computeExamAnalysisStats(opts.key)
 
   if (sourceCount === 0) {
-    await prisma.examReviewAggregate.deleteMany({
-      where: {
-        schoolId: opts.key.schoolId,
-        examTitle: opts.key.examTitle,
-        grade: opts.key.grade,
-      },
-    })
+    await deleteExamReviewAggregatesByKey(opts.key)
     return
   }
 
-  const ai = opts.generateAiSummary
+  const aiResult = opts.generateAiSummary
     ? await generateSummaryText({
         apiKey: process.env.ANTHROPIC_API_KEY ?? '',
         key: opts.key,
@@ -150,35 +136,13 @@ export async function upsertExamReviewAggregate(opts: {
       })
     : null
 
-  await prisma.examReviewAggregate.upsert({
-    where: {
-      schoolId_examTitle_grade: {
-        schoolId: opts.key.schoolId,
-        examTitle: opts.key.examTitle,
-        grade: opts.key.grade,
-      },
-    },
-    update: {
-      windowStart: opts.windowStart,
-      windowEnd: opts.windowEnd,
-      sourceCount,
-      statsJson: stats as unknown as Prisma.JsonObject,
-      aiSummary: ai?.text ?? undefined,
-      aiModel: ai?.model ?? undefined,
-      aiGeneratedAt: ai ? new Date() : undefined,
-    },
-    create: {
-      schoolId: opts.key.schoolId,
-      examTitle: opts.key.examTitle,
-      grade: opts.key.grade,
-      windowStart: opts.windowStart,
-      windowEnd: opts.windowEnd,
-      sourceCount,
-      statsJson: stats as unknown as Prisma.JsonObject,
-      aiSummary: ai?.text ?? null,
-      aiModel: ai?.model ?? null,
-      aiGeneratedAt: ai ? new Date() : null,
-    },
+  await upsertExamReviewAggregateData({
+    key: opts.key,
+    windowStart: opts.windowStart,
+    windowEnd: opts.windowEnd,
+    sourceCount,
+    statsJson: stats as unknown as Prisma.JsonObject,
+    aiResult,
   })
 }
 

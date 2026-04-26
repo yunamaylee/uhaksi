@@ -1,8 +1,6 @@
 'use client'
 
-import { useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
 import {
@@ -10,18 +8,7 @@ import {
   type CommunityCategory,
   communityShell as shell,
 } from '@/components/CommunityShared'
-
-function fileToDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const r = new FileReader()
-    r.onload = () => {
-      if (typeof r.result === 'string') resolve(r.result)
-      else reject(new Error('read'))
-    }
-    r.onerror = () => reject(r.error)
-    r.readAsDataURL(file)
-  })
-}
+import { useCommunityPostEdit } from '@/hooks/useCommunityPostEdit'
 
 export type CommunityEditInitial = {
   id: number
@@ -41,63 +28,20 @@ type Props = {
 }
 
 export default function CommunityPostEditClient({ gate, postId, initial, loadError = '' }: Props) {
-  const router = useRouter()
-  const [title, setTitle] = useState(() => initial?.title ?? '')
-  const [body, setBody] = useState(() => initial?.body ?? '')
-  const [imageFile, setImageFile] = useState<File | null>(null)
-  const [submitMsg, setSubmitMsg] = useState('')
-  const [submitting, setSubmitting] = useState(false)
+  const { title, setTitle, body, setBody, imageFile, setImageFile, submitMessage, submitting, submit } =
+    useCommunityPostEdit({ postId, initial })
 
   const loaded = gate === 'ok' && initial ? initial : null
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!loaded) return
-    setSubmitMsg('')
-    const trimmed = body.trim()
-    if (!trimmed) {
-      setSubmitMsg('내용을 입력해 주세요.')
-      return
-    }
-    if (loaded.category === 'STUDY_PROOF' && !loaded.imageData && !imageFile) {
-      setSubmitMsg('공부 인증에는 사진이 필요해요.')
-      return
-    }
-
-    setSubmitting(true)
-    try {
-      const payload: { title?: string; body?: string; imageData?: string } = {
-        title: title.trim(),
-        body: trimmed,
-      }
-      if (loaded.category === 'STUDY_PROOF' && imageFile) {
-        payload.imageData = await fileToDataUrl(imageFile)
-      }
-
-      const res = await fetch(`/api/community/posts/${postId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        setSubmitMsg(typeof data.error === 'string' ? data.error : '저장에 실패했어요.')
-        setSubmitting(false)
-        return
-      }
-      router.push(`/community/post/${postId}`)
-    } catch {
-      setSubmitMsg('네트워크 오류가 났어요.')
-    }
-    setSubmitting(false)
-  }
 
   if (gate === 'login') {
     return (
       <main style={{ minHeight: 'calc(100vh - 64px)', background: shell.pageBg, padding: '28px 20px' }}>
         <Card pastel="yellow" style={{ padding: '20px', maxWidth: '480px', margin: '0 auto' }}>
           <p style={{ margin: 0, fontWeight: 800 }}>로그인이 필요해요</p>
-          <Link href="/login" style={{ marginTop: '12px', display: 'inline-block', fontWeight: 700, color: 'var(--accent-strong)' }}>
+          <Link
+            href="/login"
+            style={{ marginTop: '12px', display: 'inline-block', fontWeight: 700, color: 'var(--accent-strong)' }}
+          >
             로그인하기
           </Link>
         </Card>
@@ -128,17 +72,23 @@ export default function CommunityPostEditClient({ gate, postId, initial, loadErr
   }
 
   return (
-    <main
-      style={{
-        minHeight: 'calc(100vh - 64px)',
-        background: shell.pageBg,
-        padding: '28px 20px 48px',
-      }}
-    >
+    <main style={{ minHeight: 'calc(100vh - 64px)', background: shell.pageBg, padding: '28px 20px 48px' }}>
       <div style={{ maxWidth: '560px', margin: '0 auto' }}>
-        <div style={{ marginBottom: '18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+        <div
+          style={{
+            marginBottom: '18px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: '12px',
+            flexWrap: 'wrap',
+          }}
+        >
           <h1 style={{ margin: 0, fontSize: '20px', fontWeight: 900, color: '#111827' }}>글 수정</h1>
-          <Link href={`/community/post/${postId}`} style={{ fontSize: '13px', fontWeight: 700, color: '#6b7280', textDecoration: 'none' }}>
+          <Link
+            href={`/community/post/${postId}`}
+            style={{ fontSize: '13px', fontWeight: 700, color: '#6b7280', textDecoration: 'none' }}
+          >
             취소
           </Link>
         </div>
@@ -147,19 +97,19 @@ export default function CommunityPostEditClient({ gate, postId, initial, loadErr
         </p>
 
         <section
-          style={{
-            background: shell.cardBg,
-            border: `1px solid ${shell.line}`,
-            borderRadius: '14px',
-            padding: '22px',
-          }}
+          style={{ background: shell.cardBg, border: `1px solid ${shell.line}`, borderRadius: '14px', padding: '22px' }}
         >
           {loaded.category === 'STUDY_PROOF' ? (
             <p style={{ margin: '0 0 12px', fontSize: '12px', color: '#9ca3af', lineHeight: 1.55 }}>
               사진을 바꾸려면 새 파일을 선택하세요. 선택하지 않으면 기존 사진이 유지돼요.
             </p>
           ) : null}
-          <form onSubmit={handleSubmit}>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              void submit()
+            }}
+          >
             <input
               className="ui-input"
               placeholder="제목 (선택)"
@@ -199,7 +149,12 @@ export default function CommunityPostEditClient({ gate, postId, initial, loadErr
                   <img
                     src={loaded.imageData}
                     alt=""
-                    style={{ maxWidth: '100%', borderRadius: '10px', marginBottom: '10px', border: `1px solid ${shell.lineSoft}` }}
+                    style={{
+                      maxWidth: '100%',
+                      borderRadius: '10px',
+                      marginBottom: '10px',
+                      border: `1px solid ${shell.lineSoft}`,
+                    }}
                   />
                 ) : null}
                 <label style={{ fontSize: '12px', fontWeight: 700, color: '#374151' }}>새 사진 (선택)</label>
@@ -211,7 +166,9 @@ export default function CommunityPostEditClient({ gate, postId, initial, loadErr
                 />
               </div>
             ) : null}
-            {submitMsg ? <p style={{ margin: '12px 0 0', fontSize: '13px', color: '#dc2626' }}>{submitMsg}</p> : null}
+            {submitMessage ? (
+              <p style={{ margin: '12px 0 0', fontSize: '13px', color: '#dc2626' }}>{submitMessage}</p>
+            ) : null}
             <div style={{ marginTop: '18px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
               <Button type="submit" variant="primary" size="md" disabled={submitting}>
                 {submitting ? '저장 중…' : '저장하기'}

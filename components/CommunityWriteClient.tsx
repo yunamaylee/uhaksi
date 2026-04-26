@@ -1,8 +1,6 @@
 'use client'
 
-import { useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
 import {
@@ -10,20 +8,9 @@ import {
   COMMUNITY_TAB_LABELS,
   communityShell as shell,
 } from '@/components/CommunityShared'
+import { useCommunityWrite } from '@/hooks/useCommunityWrite'
 
 const CATEGORIES: CommunityCategory[] = ['QA', 'STUDY_TIP', 'STUDY_PROOF']
-
-function fileToDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const r = new FileReader()
-    r.onload = () => {
-      if (typeof r.result === 'string') resolve(r.result)
-      else reject(new Error('read'))
-    }
-    r.onerror = () => reject(r.error)
-    r.readAsDataURL(file)
-  })
-}
 
 export type CommunityWriteGate = 'ok' | 'login' | 'forbidden'
 
@@ -33,62 +20,8 @@ type Props = {
 }
 
 export default function CommunityWriteClient({ gate, initialCategory }: Props) {
-  const router = useRouter()
-  const [tab, setTab] = useState<CommunityCategory>(initialCategory)
-  const [title, setTitle] = useState('')
-  const [body, setBody] = useState('')
-  const [imageFile, setImageFile] = useState<File | null>(null)
-  const [submitMsg, setSubmitMsg] = useState('')
-  const [submitting, setSubmitting] = useState(false)
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (gate !== 'ok') return
-    setSubmitMsg('')
-    const trimmed = body.trim()
-    if (!trimmed) {
-      setSubmitMsg('내용을 입력해 주세요.')
-      return
-    }
-    if (tab === 'STUDY_PROOF' && !imageFile) {
-      setSubmitMsg('공부 인증에는 사진이 필요해요.')
-      return
-    }
-
-    setSubmitting(true)
-    try {
-      let imageData = ''
-      if (tab === 'STUDY_PROOF' && imageFile) {
-        imageData = await fileToDataUrl(imageFile)
-      }
-
-      const res = await fetch('/api/community/posts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          category: tab,
-          title: title.trim() || undefined,
-          body: trimmed,
-          imageData: imageData || undefined,
-        }),
-      })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        setSubmitMsg(typeof data.error === 'string' ? data.error : '등록에 실패했어요.')
-        setSubmitting(false)
-        return
-      }
-      const newId = typeof data.post?.id === 'number' ? data.post.id : null
-      if (newId != null) {
-        router.push(`/community/post/${newId}`)
-      } else {
-        router.push(`/community?category=${tab}`)
-      }
-    } catch {
-      setSubmitMsg('네트워크 오류가 났어요.')
-    }
-    setSubmitting(false)
-  }
+  const { tab, setTab, title, setTitle, body, setBody, imageFile, setImageFile, submitMessage, submitting, submit } =
+    useCommunityWrite({ initialCategory })
 
   if (gate === 'login' || gate === 'forbidden') {
     return (
@@ -111,15 +44,18 @@ export default function CommunityWriteClient({ gate, initialCategory }: Props) {
   }
 
   return (
-    <main
-      style={{
-        minHeight: 'calc(100vh - 64px)',
-        background: shell.pageBg,
-        padding: '28px 20px 48px',
-      }}
-    >
+    <main style={{ minHeight: 'calc(100vh - 64px)', background: shell.pageBg, padding: '28px 20px 48px' }}>
       <div style={{ maxWidth: '560px', margin: '0 auto' }}>
-        <div style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+        <div
+          style={{
+            marginBottom: '20px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '12px',
+            flexWrap: 'wrap',
+          }}
+        >
           <h1 style={{ margin: 0, fontSize: '20px', fontWeight: 900, letterSpacing: '-0.5px', color: '#111827' }}>
             글쓰기
           </h1>
@@ -142,25 +78,25 @@ export default function CommunityWriteClient({ gate, initialCategory }: Props) {
         >
           <p style={{ margin: '0 0 12px', fontSize: '12px', fontWeight: 800, color: '#9ca3af' }}>게시판</p>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '18px' }}>
-            {CATEGORIES.map((c) => {
-              const on = tab === c
+            {CATEGORIES.map((category) => {
+              const isActive = tab === category
               return (
                 <button
-                  key={c}
+                  key={category}
                   type="button"
-                  onClick={() => setTab(c)}
+                  onClick={() => setTab(category)}
                   style={{
                     padding: '8px 12px',
                     fontSize: '12px',
                     fontWeight: 700,
                     borderRadius: '999px',
-                    border: `1px solid ${on ? shell.tabOn : shell.tabBorder}`,
-                    background: on ? shell.tabOn : shell.tabOff,
-                    color: on ? '#ffffff' : '#4b5563',
+                    border: `1px solid ${isActive ? shell.tabOn : shell.tabBorder}`,
+                    background: isActive ? shell.tabOn : shell.tabOff,
+                    color: isActive ? '#ffffff' : '#4b5563',
                     cursor: 'pointer',
                   }}
                 >
-                  {COMMUNITY_TAB_LABELS[c]}
+                  {COMMUNITY_TAB_LABELS[category]}
                 </button>
               )
             })}
@@ -172,7 +108,12 @@ export default function CommunityWriteClient({ gate, initialCategory }: Props) {
             </p>
           ) : null}
 
-          <form onSubmit={handleSubmit}>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              void submit()
+            }}
+          >
             <input
               className="ui-input"
               placeholder="제목 (선택)"
@@ -223,8 +164,8 @@ export default function CommunityWriteClient({ gate, initialCategory }: Props) {
                 />
               </div>
             ) : null}
-            {submitMsg ? (
-              <p style={{ margin: '12px 0 0', fontSize: '13px', color: '#dc2626' }}>{submitMsg}</p>
+            {submitMessage ? (
+              <p style={{ margin: '12px 0 0', fontSize: '13px', color: '#dc2626' }}>{submitMessage}</p>
             ) : null}
             <div style={{ marginTop: '18px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
               <Button type="submit" variant="primary" size="md" disabled={submitting}>

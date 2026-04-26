@@ -1,7 +1,7 @@
 import ExamAccordion from '@/components/ExamAccordion'
 import { extractExamPeriodsFromNeis, type NeisScheduleRow } from '@/lib/neisExam'
 import { resolveNeisSchoolCodesByAddress } from '@/lib/neisSchool'
-import { prisma } from '@/lib/prisma'
+import { findExamsBySchoolId } from '@/lib/repositories/exam'
 import { loadExamAggBundlesForExams } from '@/lib/examReviewAggregatesForSchool'
 
 type ExamPeriod = {
@@ -9,28 +9,6 @@ type ExamPeriod = {
   dates: string[]
   startDate: string
   endDate: string
-}
-
-type ExistingExam = {
-  id: number
-  title: string
-  startDate: Date
-  endDate: Date
-  subjects: Array<{
-    id: number
-    subject: string
-    grade: number | null
-    period: number | null
-    date: string | null
-  }>
-  subjectRanges: Array<{
-    id: number
-    grade: number | null
-    subject: string
-    label: string | null
-    content: string | null
-    sortOrder: number
-  }>
 }
 
 type Props = {
@@ -88,10 +66,7 @@ export default async function ExamSchedule({ schoolId, schoolName, schoolAddress
 
   const [exams, existing] = await Promise.all([
     getExamSchedule(finalRegionCode, finalNeisCode),
-    prisma.exam.findMany({
-      where: { schoolId },
-      include: { subjects: true, subjectRanges: true },
-    }) as Promise<ExistingExam[]>,
+    findExamsBySchoolId(schoolId),
   ])
 
   const existingByTitle = new Map(existing.map((e) => [e.title, e]))

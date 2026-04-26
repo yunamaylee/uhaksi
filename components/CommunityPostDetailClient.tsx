@@ -1,8 +1,7 @@
 'use client'
 
-import { useCallback, useState } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
 import {
@@ -14,6 +13,7 @@ import {
   formatCommunityDate,
 } from '@/components/CommunityShared'
 import type { CommunityPostDetail } from '@/lib/communityPostDetail'
+import { useCommunityPostDetail } from '@/hooks/useCommunityPostDetail'
 
 function listHrefForCategory(category: CommunityCategory) {
   return `/community?category=${category}`
@@ -30,134 +30,39 @@ type Props = {
 
 export default function CommunityPostDetailClient({ gate, postId, initialPost, loadError = '' }: Props) {
   const router = useRouter()
-  const [post, setPost] = useState<CommunityPostDetail | null>(() => (gate === 'ok' ? initialPost : null))
-  const [loadErr, setLoadErr] = useState(loadError)
-  const [refreshing, setRefreshing] = useState(false)
 
-  const [commentText, setCommentText] = useState('')
-  const [sending, setSending] = useState(false)
-  const [commentErr, setCommentErr] = useState('')
+  const {
+    post,
+    loadError: hookLoadError,
+    refreshing,
+    commentText,
+    setCommentText,
+    sending,
+    commentError,
+    deletingPost,
+    editingCommentId,
+    setEditingCommentId,
+    editCommentDraft,
+    setEditCommentDraft,
+    savingCommentId,
+    deletingCommentId,
+    sendComment,
+    deletePost,
+    saveCommentEdit,
+    deleteComment,
+  } = useCommunityPostDetail({ postId, initialPost: gate === 'ok' ? initialPost : null })
 
-  const [deletingPost, setDeletingPost] = useState(false)
-  const [editingCommentId, setEditingCommentId] = useState<number | null>(null)
-  const [editCommentDraft, setEditCommentDraft] = useState('')
-  const [savingCommentId, setSavingCommentId] = useState<number | null>(null)
-  const [deletingCommentId, setDeletingCommentId] = useState<number | null>(null)
+  const displayLoadError = hookLoadError || loadError
 
-  const loadPost = useCallback(async () => {
-    if (!Number.isFinite(postId)) {
-      setLoadErr('잘못된 주소예요.')
-      return
-    }
-    setRefreshing(true)
-    setLoadErr('')
-    try {
-      const res = await fetch(`/api/community/posts/${postId}`)
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        setLoadErr(typeof data.error === 'string' ? data.error : '글을 불러오지 못했어요.')
-        setPost(null)
-        return
-      }
-      setPost(data.post as CommunityPostDetail)
-    } catch {
-      setLoadErr('네트워크 오류가 났어요.')
-      setPost(null)
-    } finally {
-      setRefreshing(false)
-    }
-  }, [postId])
-
-  const sendComment = async () => {
-    const t = commentText.trim()
-    if (!t || !Number.isFinite(postId)) return
-    setSending(true)
-    setCommentErr('')
-    try {
-      const res = await fetch(`/api/community/posts/${postId}/comments`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ body: t }),
-      })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        setCommentErr(typeof data.error === 'string' ? data.error : '댓글 등록에 실패했어요.')
-        setSending(false)
-        return
-      }
-      setCommentText('')
-      await loadPost()
-    } catch {
-      setCommentErr('네트워크 오류가 났어요.')
-    }
-    setSending(false)
-  }
-
-  const deletePost = async () => {
-    if (!post || !Number.isFinite(postId)) return
+  const handlePostDelete = async () => {
     if (!window.confirm('이 글을 삭제할까요? 삭제하면 되돌릴 수 없어요.')) return
-    setDeletingPost(true)
-    try {
-      const res = await fetch(`/api/community/posts/${postId}`, { method: 'DELETE' })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        alert(typeof data.error === 'string' ? data.error : '삭제에 실패했어요.')
-        setDeletingPost(false)
-        return
-      }
-      router.push(listHrefForCategory(post.category))
-    } catch {
-      alert('네트워크 오류가 났어요.')
-    }
-    setDeletingPost(false)
+    const category = await deletePost()
+    if (category) router.push(listHrefForCategory(category as CommunityCategory))
   }
 
-  const saveCommentEdit = async (commentId: number) => {
-    const t = editCommentDraft.trim()
-    if (!t || !Number.isFinite(postId)) return
-    setSavingCommentId(commentId)
-    try {
-      const res = await fetch(`/api/community/posts/${postId}/comments/${commentId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ body: t }),
-      })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        alert(typeof data.error === 'string' ? data.error : '수정에 실패했어요.')
-        setSavingCommentId(null)
-        return
-      }
-      setEditingCommentId(null)
-      setEditCommentDraft('')
-      await loadPost()
-    } catch {
-      alert('네트워크 오류가 났어요.')
-    }
-    setSavingCommentId(null)
-  }
-
-  const deleteComment = async (commentId: number) => {
-    if (!Number.isFinite(postId)) return
+  const handleCommentDelete = async (commentId: number) => {
     if (!window.confirm('이 댓글을 삭제할까요?')) return
-    setDeletingCommentId(commentId)
-    try {
-      const res = await fetch(`/api/community/posts/${postId}/comments/${commentId}`, { method: 'DELETE' })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        alert(typeof data.error === 'string' ? data.error : '삭제에 실패했어요.')
-        setDeletingCommentId(null)
-        return
-      }
-      if (editingCommentId === commentId) {
-        setEditingCommentId(null)
-        setEditCommentDraft('')
-      }
-      await loadPost()
-    } catch {
-      alert('네트워크 오류가 났어요.')
-    }
-    setDeletingCommentId(null)
+    await deleteComment(commentId)
   }
 
   if (gate === 'login') {
@@ -166,7 +71,10 @@ export default function CommunityPostDetailClient({ gate, postId, initialPost, l
         <div style={{ maxWidth: '640px', margin: '0 auto' }}>
           <Card pastel="yellow" style={{ padding: '20px' }}>
             <p style={{ margin: 0, fontWeight: 800 }}>로그인이 필요해요</p>
-            <Link href="/login" style={{ marginTop: '12px', display: 'inline-block', fontWeight: 800, color: 'var(--accent-strong)' }}>
+            <Link
+              href="/login"
+              style={{ marginTop: '12px', display: 'inline-block', fontWeight: 800, color: 'var(--accent-strong)' }}
+            >
               로그인하기
             </Link>
           </Card>
@@ -188,11 +96,11 @@ export default function CommunityPostDetailClient({ gate, postId, initialPost, l
     )
   }
 
-  if (gate === 'error' || loadErr || !post) {
+  if (gate === 'error' || displayLoadError || !post) {
     return (
       <main style={{ minHeight: 'calc(100vh - 64px)', background: shell.pageBg, padding: '28px 20px' }}>
         <div style={{ maxWidth: '640px', margin: '0 auto' }}>
-          <p style={{ color: '#dc2626', fontSize: '14px' }}>{loadErr || '글을 찾을 수 없어요.'}</p>
+          <p style={{ color: '#dc2626', fontSize: '14px' }}>{displayLoadError || '글을 찾을 수 없어요.'}</p>
           <button
             type="button"
             onClick={() => router.push('/community')}
@@ -219,14 +127,10 @@ export default function CommunityPostDetailClient({ gate, postId, initialPost, l
   const listHref = listHrefForCategory(post.category)
 
   return (
-    <main
-      style={{
-        minHeight: 'calc(100vh - 64px)',
-        background: shell.pageBg,
-        padding: '28px 20px 48px',
-      }}
-    >
-      <div style={{ maxWidth: '640px', margin: '0 auto', opacity: refreshing ? 0.72 : 1, transition: 'opacity 0.12s ease' }}>
+    <main style={{ minHeight: 'calc(100vh - 64px)', background: shell.pageBg, padding: '28px 20px 48px' }}>
+      <div
+        style={{ maxWidth: '640px', margin: '0 auto', opacity: refreshing ? 0.72 : 1, transition: 'opacity 0.12s ease' }}
+      >
         <div style={{ marginBottom: '18px' }}>
           <Link href={listHref} style={{ fontSize: '13px', fontWeight: 700, color: '#6b7280', textDecoration: 'none' }}>
             ← {COMMUNITY_TAB_LABELS[post.category]}
@@ -259,37 +163,29 @@ export default function CommunityPostDetailClient({ gate, postId, initialPost, l
           </h1>
 
           <div
-            style={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              alignItems: 'flex-start',
-              gap: '10px 14px',
-              marginTop: '6px',
-            }}
+            style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: '10px 14px', marginTop: '6px' }}
           >
             <div style={{ flex: '1 1 180px', minWidth: 0 }}>
               <CommunityMetaRow school={post.authorSchool} date={post.createdAt} tightTop />
             </div>
             {post.isAuthor ? (
-              <div
-                style={{
-                  marginLeft: 'auto',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  paddingTop: '1px',
-                }}
-              >
+              <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '12px', paddingTop: '1px' }}>
                 <Link
                   href={`/community/post/${postId}/edit`}
-                  style={{ fontSize: '12px', fontWeight: 700, color: 'var(--accent-strong)', textDecoration: 'none', whiteSpace: 'nowrap' }}
+                  style={{
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    color: 'var(--accent-strong)',
+                    textDecoration: 'none',
+                    whiteSpace: 'nowrap',
+                  }}
                 >
                   수정
                 </Link>
                 <button
                   type="button"
                   disabled={deletingPost}
-                  onClick={() => void deletePost()}
+                  onClick={() => void handlePostDelete()}
                   style={{
                     border: 'none',
                     background: 'none',
@@ -308,15 +204,7 @@ export default function CommunityPostDetailClient({ gate, postId, initialPost, l
             ) : null}
           </div>
 
-          <div
-            style={{
-              marginTop: '20px',
-              fontSize: '15px',
-              lineHeight: 1.8,
-              color: '#1f2937',
-              whiteSpace: 'pre-wrap',
-            }}
-          >
+          <div style={{ marginTop: '20px', fontSize: '15px', lineHeight: 1.8, color: '#1f2937', whiteSpace: 'pre-wrap' }}>
             {post.body}
           </div>
 
@@ -352,12 +240,12 @@ export default function CommunityPostDetailClient({ gate, postId, initialPost, l
             <p style={{ margin: '0 0 16px', fontSize: '13px', color: '#9ca3af' }}>첫 댓글을 남겨 보세요.</p>
           ) : (
             <ul style={{ listStyle: 'none', margin: '0 0 18px', padding: 0 }}>
-              {post.comments.map((c, i) => (
+              {post.comments.map((comment, index) => (
                 <li
-                  key={c.id}
+                  key={comment.id}
                   style={{
                     padding: '14px 0',
-                    borderBottom: i === post.comments.length - 1 ? 'none' : `1px solid ${shell.lineSoft}`,
+                    borderBottom: index === post.comments.length - 1 ? 'none' : `1px solid ${shell.lineSoft}`,
                   }}
                 >
                   <div
@@ -382,13 +270,13 @@ export default function CommunityPostDetailClient({ gate, postId, initialPost, l
                       <PersonGlyph size={13} />
                       <span style={{ fontWeight: 700, color: '#4b5563' }}>익명</span>
                       <span style={{ color: '#e5e7eb' }}>|</span>
-                      <span style={{ fontWeight: 600, color: '#6b7280' }}>{c.authorSchool}</span>
+                      <span style={{ fontWeight: 600, color: '#6b7280' }}>{comment.authorSchool}</span>
                       <span style={{ color: '#e5e7eb' }}>·</span>
-                      <time style={{ color: '#9ca3af' }} dateTime={c.createdAt}>
-                        {formatCommunityDate(c.createdAt)}
+                      <time style={{ color: '#9ca3af' }} dateTime={comment.createdAt}>
+                        {formatCommunityDate(comment.createdAt)}
                       </time>
                     </div>
-                    {c.isAuthor ? (
+                    {comment.isAuthor ? (
                       <div
                         style={{
                           marginLeft: 'auto',
@@ -399,29 +287,33 @@ export default function CommunityPostDetailClient({ gate, postId, initialPost, l
                           paddingTop: '1px',
                         }}
                       >
-                        {editingCommentId === c.id ? (
+                        {editingCommentId === comment.id ? (
                           <>
                             <button
                               type="button"
-                              disabled={savingCommentId === c.id || !editCommentDraft.trim()}
-                              onClick={() => void saveCommentEdit(c.id)}
+                              disabled={savingCommentId === comment.id || !editCommentDraft.trim()}
+                              onClick={() => void saveCommentEdit(comment.id)}
                               style={{
                                 border: 'none',
                                 background: 'none',
                                 padding: 0,
                                 fontSize: '11px',
                                 fontWeight: 800,
-                                color: savingCommentId === c.id || !editCommentDraft.trim() ? '#d1d5db' : 'var(--accent-strong)',
-                                cursor: savingCommentId === c.id || !editCommentDraft.trim() ? 'default' : 'pointer',
+                                color:
+                                  savingCommentId === comment.id || !editCommentDraft.trim()
+                                    ? '#d1d5db'
+                                    : 'var(--accent-strong)',
+                                cursor:
+                                  savingCommentId === comment.id || !editCommentDraft.trim() ? 'default' : 'pointer',
                                 fontFamily: 'inherit',
                                 whiteSpace: 'nowrap',
                               }}
                             >
-                              {savingCommentId === c.id ? '저장 중…' : '저장'}
+                              {savingCommentId === comment.id ? '저장 중…' : '저장'}
                             </button>
                             <button
                               type="button"
-                              disabled={savingCommentId === c.id}
+                              disabled={savingCommentId === comment.id}
                               onClick={() => {
                                 setEditingCommentId(null)
                                 setEditCommentDraft('')
@@ -433,7 +325,7 @@ export default function CommunityPostDetailClient({ gate, postId, initialPost, l
                                 fontSize: '11px',
                                 fontWeight: 700,
                                 color: '#6b7280',
-                                cursor: savingCommentId === c.id ? 'default' : 'pointer',
+                                cursor: savingCommentId === comment.id ? 'default' : 'pointer',
                                 fontFamily: 'inherit',
                                 whiteSpace: 'nowrap',
                               }}
@@ -445,10 +337,10 @@ export default function CommunityPostDetailClient({ gate, postId, initialPost, l
                           <>
                             <button
                               type="button"
-                              disabled={deletingCommentId === c.id}
+                              disabled={deletingCommentId === comment.id}
                               onClick={() => {
-                                setEditingCommentId(c.id)
-                                setEditCommentDraft(c.body)
+                                setEditingCommentId(comment.id)
+                                setEditCommentDraft(comment.body)
                               }}
                               style={{
                                 border: 'none',
@@ -456,8 +348,8 @@ export default function CommunityPostDetailClient({ gate, postId, initialPost, l
                                 padding: 0,
                                 fontSize: '11px',
                                 fontWeight: 800,
-                                color: deletingCommentId === c.id ? '#d1d5db' : 'var(--accent-strong)',
-                                cursor: deletingCommentId === c.id ? 'default' : 'pointer',
+                                color: deletingCommentId === comment.id ? '#d1d5db' : 'var(--accent-strong)',
+                                cursor: deletingCommentId === comment.id ? 'default' : 'pointer',
                                 fontFamily: 'inherit',
                                 whiteSpace: 'nowrap',
                               }}
@@ -466,28 +358,28 @@ export default function CommunityPostDetailClient({ gate, postId, initialPost, l
                             </button>
                             <button
                               type="button"
-                              disabled={deletingCommentId === c.id}
-                              onClick={() => void deleteComment(c.id)}
+                              disabled={deletingCommentId === comment.id}
+                              onClick={() => void handleCommentDelete(comment.id)}
                               style={{
                                 border: 'none',
                                 background: 'none',
                                 padding: 0,
                                 fontSize: '11px',
                                 fontWeight: 700,
-                                color: deletingCommentId === c.id ? '#d1d5db' : '#dc2626',
-                                cursor: deletingCommentId === c.id ? 'default' : 'pointer',
+                                color: deletingCommentId === comment.id ? '#d1d5db' : '#dc2626',
+                                cursor: deletingCommentId === comment.id ? 'default' : 'pointer',
                                 fontFamily: 'inherit',
                                 whiteSpace: 'nowrap',
                               }}
                             >
-                              {deletingCommentId === c.id ? '삭제 중…' : '삭제'}
+                              {deletingCommentId === comment.id ? '삭제 중…' : '삭제'}
                             </button>
                           </>
                         )}
                       </div>
                     ) : null}
                   </div>
-                  {editingCommentId === c.id ? (
+                  {editingCommentId === comment.id ? (
                     <textarea
                       className="ui-input"
                       value={editCommentDraft}
@@ -509,16 +401,8 @@ export default function CommunityPostDetailClient({ gate, postId, initialPost, l
                       }}
                     />
                   ) : (
-                    <p
-                      style={{
-                        margin: '8px 0 0',
-                        fontSize: '14px',
-                        lineHeight: 1.65,
-                        color: '#374151',
-                        whiteSpace: 'pre-wrap',
-                      }}
-                    >
-                      {c.body}
+                    <p style={{ margin: '8px 0 0', fontSize: '14px', lineHeight: 1.65, color: '#374151', whiteSpace: 'pre-wrap' }}>
+                      {comment.body}
                     </p>
                   )}
                 </li>
@@ -545,9 +429,15 @@ export default function CommunityPostDetailClient({ gate, postId, initialPost, l
               background: '#fafafa',
             }}
           />
-          {commentErr ? <p style={{ margin: '8px 0 0', fontSize: '12px', color: '#dc2626' }}>{commentErr}</p> : null}
+          {commentError ? <p style={{ margin: '8px 0 0', fontSize: '12px', color: '#dc2626' }}>{commentError}</p> : null}
           <div style={{ marginTop: '12px' }}>
-            <Button type="button" variant="primary" size="md" disabled={sending || !commentText.trim()} onClick={sendComment}>
+            <Button
+              type="button"
+              variant="primary"
+              size="md"
+              disabled={sending || !commentText.trim()}
+              onClick={() => void sendComment()}
+            >
               {sending ? '등록 중…' : '댓글 등록'}
             </Button>
           </div>
