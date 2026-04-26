@@ -1,4 +1,4 @@
-import { prisma } from '@/lib/prisma'
+import { findExamReviewAggregatesBySchoolAndTitles } from '@/lib/repositories/examAnalysisAggregate'
 
 /** 클라이언트·서버 경계에서 그대로 넘길 집계 스냅샷 */
 export type ExamReviewAggregateClient = {
@@ -21,13 +21,7 @@ export async function loadExamAggBundlesForExams(
   }
   if (examTitles.length === 0) return map
 
-  const rows = await prisma.examReviewAggregate.findMany({
-    where: {
-      schoolId,
-      examTitle: { in: examTitles },
-      grade: { in: [1, 2, 3] },
-    },
-  })
+  const rows = await findExamReviewAggregatesBySchoolAndTitles(schoolId, examTitles)
 
   for (const row of rows) {
     const bundle = map.get(row.examTitle)

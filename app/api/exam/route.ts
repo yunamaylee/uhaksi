@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
-import { prisma } from '@/lib/prisma'
 import { authOptions } from '@/lib/auth'
+import { upsertExam, deleteExam, NotFoundError } from '@/lib/services/exam'
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,95 +16,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '필수 값이 누락됐습니다.' }, { status: 400 })
     }
 
-    const school = await prisma.school.findUnique({
-      where: { id: Number(schoolId) }
+    const exam = await upsertExam({
+      schoolId: Number(schoolId),
+      title,
+      startDate,
+      endDate,
+      subjects,
+      subjectRanges,
     })
-
-    if (!school) {
-      return NextResponse.json({ error: '학교를 찾을 수 없습니다.' }, { status: 404 })
-    }
-
-    function parseDate(yyyymmdd: string) {
-      const year = parseInt(yyyymmdd.slice(0, 4))
-      const month = parseInt(yyyymmdd.slice(4, 6)) - 1
-      const day = parseInt(yyyymmdd.slice(6, 8))
-      return new Date(year, month, day)
-    }
-
-    const existingExam = await prisma.exam.findFirst({
-      where: { schoolId: school.id, title }
-    })
-
-    let exam
-
-    if (existingExam) {
-      await prisma.examSubject.deleteMany({
-        where: { examId: existingExam.id }
-      })
-      await prisma.subjectRange.deleteMany({
-        where: { examId: existingExam.id }
-      })
-      exam = await prisma.exam.update({
-        where: { id: existingExam.id },
-        data: {
-          subjects: {
-            create: subjects ?? []
-          },
-          subjectRanges: {
-            create: (subjectRanges ?? []).map(
-              (r: {
-                grade?: number | null
-                subject: string
-                label?: string | null
-                content?: string | null
-                sortOrder?: number | null
-              }) => ({
-              grade: typeof r.grade === 'number' ? r.grade : null,
-              subject: r.subject,
-              label: r.label?.trim() ? r.label.trim() : null,
-              content: r.content?.trim() ? r.content.trim() : null,
-              sortOrder: typeof r.sortOrder === 'number' ? r.sortOrder : 0,
-            }))
-          }
-        },
-        include: { subjects: true, subjectRanges: true }
-      })
-    } else {
-      exam = await prisma.exam.create({
-        data: {
-          schoolId: school.id,
-          title,
-          startDate: parseDate(startDate),
-          endDate: parseDate(endDate),
-          subjects: {
-            create: subjects ?? []
-          },
-          subjectRanges: {
-            create: (subjectRanges ?? []).map(
-              (r: {
-                grade?: number | null
-                subject: string
-                label?: string | null
-                content?: string | null
-                sortOrder?: number | null
-              }) => ({
-              grade: typeof r.grade === 'number' ? r.grade : null,
-              subject: r.subject,
-              label: r.label?.trim() ? r.label.trim() : null,
-              content: r.content?.trim() ? r.content.trim() : null,
-              sortOrder: typeof r.sortOrder === 'number' ? r.sortOrder : 0,
-            }))
-          }
-        },
-        include: { subjects: true, subjectRanges: true }
-      })
-    }
 
     return NextResponse.json(exam)
-
   } catch (e) {
-    console.error('에러:', e)
-    return NextResponse.json({ error: String(e) }, { status: 500 })
+    if (e instanceof NotFoundError) {
+      return NextResponse.json({ error: e.message }, { status: 404 })
+    }
+    console.error('POST /api/exam 에러:', e)
+    return NextResponse.json({ error: '서버 오류가 발생했습니다.' }, { status: 500 })
   }
 }
 
@@ -125,13 +52,11 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: '잘못된 examId 입니다.' }, { status: 400 })
     }
 
-    await prisma.examSubject.deleteMany({ where: { examId: id } })
-    await prisma.subjectRange.deleteMany({ where: { examId: id } })
-    await prisma.exam.delete({ where: { id } })
+    await deleteExam(id)
 
     return NextResponse.json({ ok: true })
   } catch (e) {
-    console.error('에러:', e)
-    return NextResponse.json({ error: String(e) }, { status: 500 })
+    console.error('DELETE /api/exam 에러:', e)
+    return NextResponse.json({ error: '서버 오류가 발생했습니다.' }, { status: 500 })
   }
 }

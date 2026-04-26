@@ -26,20 +26,7 @@ export default async function SchoolPage({ params }: Props) {
 
   let school: SchoolWithExams | null = null
 
-  if (isNumericId(decoded)) {
-    const schoolId = Number(decoded)
-    school = await prisma.school.findUnique({
-      where: { id: schoolId },
-      include: {
-        exams: {
-          include: {
-            subjects: true,
-          },
-        },
-      },
-    })
-    if (!school) notFound()
-  } else {
+  if (!isNumericId(decoded)) {
     const matches = await prisma.school.findMany({
       where: { name: decoded },
       orderBy: [{ address: 'asc' }, { id: 'asc' }],
@@ -123,6 +110,23 @@ export default async function SchoolPage({ params }: Props) {
 
     if (!school) notFound()
   }
+
+  if (isNumericId(decoded)) {
+    const schoolId = Number(decoded)
+    school = await prisma.school.findUnique({
+      where: { id: schoolId },
+      include: {
+        exams: {
+          include: {
+            subjects: true,
+          },
+        },
+      },
+    })
+    if (!school) notFound()
+  }
+
+  if (!school) notFound()
 
   return (
     <main>

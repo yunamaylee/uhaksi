@@ -101,9 +101,10 @@ function LoginPageInner() {
       const safe =
         raw && raw.startsWith('/') && !raw.startsWith('//') ? raw : '/'
       router.push(safe)
-    } else {
-      setMessage('아이디 또는 비밀번호가 올바르지 않습니다. (이메일 인증을 마쳤는지도 확인해주세요.)')
+      setLoading(false)
+      return
     }
+    setMessage('아이디 또는 비밀번호가 올바르지 않습니다. (이메일 인증을 마쳤는지도 확인해주세요.)')
     setLoading(false)
   }
 
@@ -124,9 +125,10 @@ function LoginPageInner() {
 
     if (res.ok) {
       setMessage('인증 이메일을 발송했습니다. 이메일을 확인해주세요.')
-    } else {
-      setMessage(data.error)
+      setLoading(false)
+      return
     }
+    setMessage(data.error)
     setLoading(false)
   }
 

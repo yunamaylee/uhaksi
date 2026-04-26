@@ -1,10 +1,10 @@
 'use client'
 
 import Link from 'next/link'
-import { signOut } from 'next-auth/react'
 import { useState, type CSSProperties, type ReactNode } from 'react'
 import type { AccountKind } from '@/types/accountKind'
 import Button from '@/components/ui/Button'
+import { useAccountWithdraw } from '@/hooks/useAccountWithdraw'
 
 export type AccountMyPanelUser = {
   loginId: string
@@ -68,15 +68,7 @@ const valueStyle: CSSProperties = {
   letterSpacing: '-0.02em',
 }
 
-function ProfileRow({
-  children,
-  isFirst,
-  isLast,
-}: {
-  children: ReactNode
-  isFirst?: boolean
-  isLast?: boolean
-}) {
+function ProfileRow({ children, isFirst, isLast }: { children: ReactNode; isFirst?: boolean; isLast?: boolean }) {
   return (
     <div
       style={{
@@ -92,59 +84,23 @@ function ProfileRow({
 
 export default function AccountMyPanel({ user }: { user: AccountMyPanelUser }) {
   const [password, setPassword] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [message, setMessage] = useState('')
+  const { loading, message, withdraw } = useAccountWithdraw()
 
   const canWithdraw = user.emailVerified && !user.isAdmin
 
-  const handleWithdraw = async () => {
+  const handleAccountWithdraw = async () => {
     if (!canWithdraw) return
-    if (!password) {
-      setMessage('탈퇴하려면 비밀번호를 입력해 주세요.')
-      return
-    }
-    const sure = window.confirm(
+    if (!password) return
+    const confirmed = window.confirm(
       '정말 탈퇴할까요? 작성한 커뮤니티 글·댓글·시험 후기가 삭제되며 복구할 수 없습니다.',
     )
-    if (!sure) return
-
-    setLoading(true)
-    setMessage('')
-    try {
-      const res = await fetch('/api/account/delete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
-      })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        setMessage(typeof data.error === 'string' ? data.error : '탈퇴 처리에 실패했어요.')
-        setLoading(false)
-        return
-      }
-      await signOut({ callbackUrl: '/' })
-    } catch {
-      setMessage('네트워크 오류가 났어요. 잠시 후 다시 시도해 주세요.')
-    }
-    setLoading(false)
+    if (!confirmed) return
+    await withdraw(password)
   }
 
   return (
-    <main
-      style={{
-        background: pageBg,
-        color: ink,
-        minHeight: '100%',
-        flex: 1,
-      }}
-    >
-      <div
-        style={{
-          maxWidth: '560px',
-          margin: '0 auto',
-          padding: '52px 24px 64px',
-        }}
-      >
+    <main style={{ background: pageBg, color: ink, minHeight: '100%', flex: 1 }}>
+      <div style={{ maxWidth: '560px', margin: '0 auto', padding: '52px 24px 64px' }}>
         <h1
           style={{
             fontSize: '24px',
@@ -177,13 +133,7 @@ export default function AccountMyPanel({ user }: { user: AccountMyPanelUser }) {
             </ProfileRow>
             <ProfileRow>
               <dt style={labelStyle}>이메일 인증</dt>
-              <dd
-                style={{
-                  ...valueStyle,
-                  fontWeight: 700,
-                  color: user.emailVerified ? '#166534' : '#b45309',
-                }}
-              >
+              <dd style={{ ...valueStyle, fontWeight: 700, color: user.emailVerified ? '#166534' : '#b45309' }}>
                 {user.emailVerified ? '완료' : '미완료 (로그인하려면 인증이 필요해요)'}
               </dd>
             </ProfileRow>
@@ -240,13 +190,7 @@ export default function AccountMyPanel({ user }: { user: AccountMyPanelUser }) {
               ) : (
                 <>
                   <label
-                    style={{
-                      display: 'block',
-                      fontSize: '13px',
-                      fontWeight: 700,
-                      color: ink,
-                      marginBottom: '8px',
-                    }}
+                    style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: ink, marginBottom: '8px' }}
                   >
                     비밀번호 확인
                   </label>
@@ -272,7 +216,7 @@ export default function AccountMyPanel({ user }: { user: AccountMyPanelUser }) {
                       {message}
                     </p>
                   ) : null}
-                  <Button type="button" variant="danger" disabled={loading} onClick={handleWithdraw}>
+                  <Button type="button" variant="danger" disabled={loading} onClick={() => void handleAccountWithdraw()}>
                     {loading ? '처리 중…' : '탈퇴하기'}
                   </Button>
                 </>

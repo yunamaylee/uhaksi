@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { verifyEmail } from '@/lib/services/user'
 
 export async function GET(request: NextRequest) {
   const token = request.nextUrl.searchParams.get('token')
@@ -8,21 +8,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL('/login?error=invalid', request.url))
   }
 
-  const user = await prisma.user.findFirst({
-    where: { verifyToken: token }
-  })
-
-  if (!user) {
+  try {
+    await verifyEmail(token)
+    return NextResponse.redirect(new URL('/login?verified=true', request.url))
+  } catch {
     return NextResponse.redirect(new URL('/login?error=invalid', request.url))
   }
-
-  await prisma.user.update({
-    where: { id: user.id },
-    data: {
-      emailVerified: true,
-      verifyToken: null,
-    }
-  })
-
-  return NextResponse.redirect(new URL('/login?verified=true', request.url))
 }

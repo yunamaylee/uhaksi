@@ -1,10 +1,9 @@
 'use client'
 
-/* eslint-disable react-hooks/set-state-in-effect */
-
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { sanitizeAiSummaryText, splitAiSummaryParagraphs } from '@/lib/aiSummaryDisplay'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { useExamAnalysis } from '@/hooks/useExamAnalysis'
 
 type Props = {
   schoolId: number
@@ -12,13 +11,6 @@ type Props = {
   grade: number
   /** 후기 저장·삭제 등 집계 갱신 후 다시 불러올 때 증가 */
   reloadKey?: number
-}
-
-type Aggregate = {
-  sourceCount: number
-  statsJson: unknown
-  aiSummary: string | null
-  aiGeneratedAt: string | null
 }
 
 type StatsShape = {
@@ -32,28 +24,7 @@ function asStatsShape(v: unknown): StatsShape {
 }
 
 export default function ExamAnalysisPanel({ schoolId, examTitle, grade, reloadKey = 0 }: Props) {
-  const [loading, setLoading] = useState(true)
-  const [agg, setAgg] = useState<Aggregate | null>(null)
-
-  useEffect(() => {
-    let cancelled = false
-    setLoading(true)
-    fetch(
-      `/api/exam-analysis?schoolId=${schoolId}&examTitle=${encodeURIComponent(examTitle)}&grade=${grade}`,
-    )
-      .then((r) => r.json())
-      .then((d) => {
-        if (cancelled) return
-        setAgg(d.aggregate ?? null)
-      })
-      .finally(() => {
-        if (cancelled) return
-        setLoading(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [schoolId, examTitle, grade, reloadKey])
+  const { loading, agg } = useExamAnalysis(schoolId, examTitle, grade, { reloadKey })
 
   const difficultyData = useMemo(() => {
     const hist = asStatsShape(agg?.statsJson)?.difficulty?.histogram ?? null

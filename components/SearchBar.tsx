@@ -1,64 +1,15 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
-import { useRouter } from 'next/navigation'
 import Button from '@/components/ui/Button'
-
-type School = {
-  id: number
-  name: string
-  address?: string | null
-}
+import { useSchoolSearch } from '@/hooks/useSchoolSearch'
 
 export default function SearchBar() {
-  const [query, setQuery] = useState('')
-  const [results, setResults] = useState<School[]>([])
-  const [show, setShow] = useState(false)
-  const [isNavigating, setIsNavigating] = useState(false)
-  const router = useRouter()
-  const ref = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (query.length < 1 || isNavigating) return
-    const timer = setTimeout(async () => {
-      const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`)
-      const data = await res.json()
-      setResults(data)
-      setShow(true)
-    }, 300)
-    return () => clearTimeout(timer)
-  }, [query, isNavigating])
-
-  const handleSelect = (school: School) => {
-    setIsNavigating(true)
-    setShow(false)
-    setResults([])
-    setQuery('')
-    router.push(`/school/${school.id}`)
-  }
-
-  const handleSearch = async () => {
-    if (!query.trim()) return
-    setShow(false)
-
-    if (results.length > 0) {
-      handleSelect(results[0])
-      return
-    }
-
-    const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`)
-    const data = await res.json()
-
-    if (data.length > 0) {
-      handleSelect(data[0])
-    } else {
-      alert('학교를 찾을 수 없습니다. 다시 검색해보세요.')
-    }
-  }
+  const { query, setQuery, results, showDropdown, setShowDropdown, isNavigating, notFound, select, search } =
+    useSchoolSearch()
 
   return (
     <div style={{ width: '100%' }}>
-      <div ref={ref} style={{ position: 'relative', display: 'flex', gap: '8px' }}>
+      <div style={{ position: 'relative', display: 'flex', gap: '8px' }}>
         <input
           className="ui-input"
           type="text"
@@ -66,14 +17,10 @@ export default function SearchBar() {
           disabled={isNavigating}
           onChange={(e) => {
             const next = e.target.value
-            setIsNavigating(false)
             setQuery(next)
-            if (next.length < 1) {
-              setResults([])
-              setShow(false)
-            }
+            if (next.length < 1) setShowDropdown(false)
           }}
-          onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+          onKeyDown={(e) => e.key === 'Enter' && void search()}
           placeholder="학교 이름을 입력하세요"
           style={{
             flex: 1,
@@ -83,32 +30,37 @@ export default function SearchBar() {
             opacity: isNavigating ? 0.6 : 1,
           }}
         />
-        <Button onClick={handleSearch} variant="primary" style={{ padding: '11px 18px', borderRadius: '14px', fontSize: '15px' }}>
+        <Button
+          onClick={() => void search()}
+          variant="primary"
+          style={{ padding: '11px 18px', borderRadius: '14px', fontSize: '15px' }}
+        >
           {isNavigating ? '이동 중...' : '검색'}
         </Button>
 
-        {show && results.length > 0 && !isNavigating && (
-          <ul style={{
-            position: 'absolute',
-            top: 'calc(100% + 4px)',
-            left: 0,
-            right: '72px',
-            background: 'white',
-            border: '1px solid var(--sage-border)',
-            borderRadius: '14px',
-            listStyle: 'none',
-            padding: '4px 0',
-            margin: 0,
-            /* 상단 sticky 네비(z-index 높음) 아래에만 보이도록 과도한 값 지양 */
-            zIndex: 30,
-            maxHeight: '288px',
-            overflowY: 'auto',
-            boxShadow: '0 10px 24px rgba(15, 20, 25, 0.12)',
-          }}>
+        {showDropdown && results.length > 0 && !isNavigating && (
+          <ul
+            style={{
+              position: 'absolute',
+              top: 'calc(100% + 4px)',
+              left: 0,
+              right: '72px',
+              background: 'white',
+              border: '1px solid var(--sage-border)',
+              borderRadius: '14px',
+              listStyle: 'none',
+              padding: '4px 0',
+              margin: 0,
+              zIndex: 30,
+              maxHeight: '288px',
+              overflowY: 'auto',
+              boxShadow: '0 10px 24px rgba(15, 20, 25, 0.12)',
+            }}
+          >
             {results.map((school) => (
               <li
                 key={school.id}
-                onClick={() => handleSelect(school)}
+                onClick={() => select(school)}
                 style={{
                   padding: '10px 14px',
                   cursor: 'pointer',
@@ -128,6 +80,11 @@ export default function SearchBar() {
           </ul>
         )}
       </div>
+      {notFound && (
+        <p style={{ margin: '8px 0 0', fontSize: '13px', color: '#dc2626' }}>
+          학교를 찾을 수 없습니다. 다시 검색해보세요.
+        </p>
+      )}
     </div>
   )
 }

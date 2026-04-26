@@ -1,7 +1,7 @@
 import type { Session } from 'next-auth'
-import { prisma } from '@/lib/prisma'
 import { canAccessStudentCommunity } from '@/lib/communityAccess'
 import { communityAuthorSchool } from '@/lib/communityDisplay'
+import { findPostsForFeed } from '@/lib/repositories/community'
 import type { CommunityCategory } from '@/types/communityCategory'
 
 const CATEGORIES: CommunityCategory[] = ['QA', 'STUDY_TIP', 'STUDY_PROOF']
@@ -33,20 +33,7 @@ export async function getCommunityPostsForFeed(
     return { ok: false, code: 'BAD_CATEGORY' }
   }
 
-  const rows = await prisma.studentCommunityPost.findMany({
-    where: { category },
-    orderBy: { createdAt: 'desc' },
-    take: 100,
-    select: {
-      id: true,
-      category: true,
-      title: true,
-      body: true,
-      imageData: true,
-      createdAt: true,
-      user: { select: { isAdmin: true, verifiedSchoolName: true } },
-    },
-  })
+  const rows = await findPostsForFeed(category)
 
   const posts: CommunityFeedPost[] = rows.map((p) => ({
     id: p.id,

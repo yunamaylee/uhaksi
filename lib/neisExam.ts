@@ -106,10 +106,10 @@ function clusterDates(dates: string[]): string[][] {
     // 그 이상 벌어지면 다른 시험/이벤트로 취급합니다.
     if (gap <= 3) {
       cur.push(next)
-    } else {
-      clusters.push(cur)
-      cur = [next]
+      continue
     }
+    clusters.push(cur)
+    cur = [next]
   }
   clusters.push(cur)
   return clusters

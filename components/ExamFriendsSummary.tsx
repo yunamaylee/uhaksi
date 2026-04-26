@@ -1,13 +1,12 @@
 'use client'
 
-/* eslint-disable react-hooks/set-state-in-effect */
-
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import Link from 'next/link'
 import Button from '@/components/ui/Button'
 import { IconBot } from '@/components/icons/ToolbarIcons'
 import type { ExamAggBundle, ExamReviewAggregateClient } from '@/lib/examReviewAggregatesForSchool'
 import { sanitizeAiSummaryText, splitAiSummaryParagraphs } from '@/lib/aiSummaryDisplay'
+import { useExamAnalysis } from '@/hooks/useExamAnalysis'
 
 type Props = {
   schoolId: number
@@ -75,39 +74,7 @@ export default function ExamFriendsSummary({
   locked = false,
   initialByGrade,
 }: Props) {
-  const g = grade === 1 || grade === 2 || grade === 3 ? grade : 1
-  const seeded = initialByGrade?.[g]
-  const [loading, setLoading] = useState(() => initialByGrade === undefined)
-  const [agg, setAgg] = useState<Aggregate | null>(() => seeded ?? null)
-
-  useEffect(() => {
-    let cancelled = false
-
-    if (reloadKey === 0 && initialByGrade !== undefined) {
-      setAgg(initialByGrade[g] ?? null)
-      setLoading(false)
-      return () => {
-        cancelled = true
-      }
-    }
-
-    const quietRefresh = reloadKey > 0
-    if (!quietRefresh) setLoading(true)
-
-    fetch(`/api/exam-analysis?schoolId=${schoolId}&examTitle=${encodeURIComponent(examTitle)}&grade=${grade}`)
-      .then((r) => r.json())
-      .then((d) => {
-        if (cancelled) return
-        setAgg(d.aggregate ?? null)
-      })
-      .finally(() => {
-        if (cancelled) return
-        setLoading(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [schoolId, examTitle, grade, g, reloadKey, initialByGrade])
+  const { loading, agg } = useExamAnalysis(schoolId, examTitle, grade, { initialByGrade, reloadKey })
 
   const computed = useMemo(() => {
     const stats = asStatsShape(agg?.statsJson)
