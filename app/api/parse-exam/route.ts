@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { parseExamFromImage } from '@/lib/services/parseExam'
-import { RateLimitError } from '@/lib/services/errors'
+import { RateLimitError, httpStatusFromError } from '@/lib/services/errors'
 
 export async function POST(request: NextRequest) {
   try {
@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     if (e instanceof RateLimitError) {
       return NextResponse.json(
         { error: e.message },
-        { status: 503, headers: { 'Retry-After': '30' } },
+        { status: httpStatusFromError(e), headers: { 'Retry-After': '30' } },
       )
     }
     console.error('POST /api/parse-exam 에러:', e)

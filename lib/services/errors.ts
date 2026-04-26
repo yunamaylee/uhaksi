@@ -42,5 +42,6 @@ export function httpStatusFromError(e: unknown): number {
   if (e instanceof ForbiddenError) return 403
   if (e instanceof ValidationError) return 400
   if (e instanceof RateLimitError) return 503
+  if (e instanceof MailDeliveryError) return 500
   return 500
 }

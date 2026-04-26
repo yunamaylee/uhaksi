@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSessionUserId } from '@/lib/sessionUser'
 import { updateReview, removeReview } from '@/lib/services/examReview'
-import { NotFoundError, ForbiddenError, ValidationError } from '@/lib/services/errors'
+import { NotFoundError, ForbiddenError, ValidationError, httpStatusFromError } from '@/lib/services/errors'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -43,9 +43,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
     return NextResponse.json({ ok: true })
   } catch (e) {
-    if (e instanceof NotFoundError) return NextResponse.json({ error: e.message }, { status: 404 })
-    if (e instanceof ForbiddenError) return NextResponse.json({ error: e.message }, { status: 403 })
-    if (e instanceof ValidationError) return NextResponse.json({ error: e.message }, { status: 400 })
+    if (e instanceof NotFoundError || e instanceof ForbiddenError || e instanceof ValidationError) {
+      return NextResponse.json({ error: e.message }, { status: httpStatusFromError(e) })
+    }
     console.error('PATCH /api/exam-reviews/[id] 에러:', e)
     return NextResponse.json({ error: '서버 오류가 발생했습니다.' }, { status: 500 })
   }
@@ -64,8 +64,9 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
 
     return NextResponse.json({ ok: true })
   } catch (e) {
-    if (e instanceof NotFoundError) return NextResponse.json({ error: e.message }, { status: 404 })
-    if (e instanceof ForbiddenError) return NextResponse.json({ error: e.message }, { status: 403 })
+    if (e instanceof NotFoundError || e instanceof ForbiddenError) {
+      return NextResponse.json({ error: e.message }, { status: httpStatusFromError(e) })
+    }
     console.error('DELETE /api/exam-reviews/[id] 에러:', e)
     return NextResponse.json({ error: '서버 오류가 발생했습니다.' }, { status: 500 })
   }

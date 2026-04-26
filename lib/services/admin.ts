@@ -1,7 +1,7 @@
-import { upsertExamReviewAggregate } from '@/lib/examAnalysis'
+import { upsertExamReviewAggregate } from '@/lib/services/examAnalysis'
 import { purgeStaleExamData } from '@/lib/dataRetention'
 import { findDistinctExamReviewKeys } from '@/lib/repositories/examReview'
-import type { ExamAnalysisKey } from '@/lib/examAnalysis'
+import type { ExamAnalysisKey } from '@/lib/services/examAnalysis'
 
 export type RecomputeOptions = {
   schoolId: number | null

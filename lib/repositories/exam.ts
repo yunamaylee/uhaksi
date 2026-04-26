@@ -101,6 +101,15 @@ export async function deleteExamById(id: number): Promise<void> {
   await prisma.exam.delete({ where: { id } })
 }
 
+// 시험 및 연관 데이터 트랜잭션 삭제 (ExamSubject → SubjectRange → Exam 순)
+export async function deleteExamWithRelations(examId: number): Promise<void> {
+  await prisma.$transaction([
+    prisma.examSubject.deleteMany({ where: { examId } }),
+    prisma.subjectRange.deleteMany({ where: { examId } }),
+    prisma.exam.delete({ where: { id: examId } }),
+  ])
+}
+
 // 학교 ID로 시험 목록 조회 (과목·범위 포함)
 export async function findExamsBySchoolId(schoolId: number): Promise<ExistingExam[]> {
   return prisma.exam.findMany({

@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { canAccessStudentCommunity } from '@/lib/communityAccess'
 import { updateCommunityComment, deleteCommunityComment } from '@/lib/services/community'
-import { NotFoundError, ForbiddenError, ValidationError } from '@/lib/services/errors'
+import { NotFoundError, ForbiddenError, ValidationError, httpStatusFromError } from '@/lib/services/errors'
 
 type Params = { params: Promise<{ postId: string; commentId: string }> }
 
@@ -46,9 +46,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
     return NextResponse.json({ comment })
   } catch (e) {
-    if (e instanceof NotFoundError) return NextResponse.json({ error: e.message }, { status: 404 })
-    if (e instanceof ForbiddenError) return NextResponse.json({ error: e.message }, { status: 403 })
-    if (e instanceof ValidationError) return NextResponse.json({ error: e.message }, { status: 400 })
+    if (e instanceof NotFoundError || e instanceof ForbiddenError || e instanceof ValidationError) {
+      return NextResponse.json({ error: e.message }, { status: httpStatusFromError(e) })
+    }
     console.error('PATCH /api/community/posts/[postId]/comments/[commentId] 에러:', e)
     return NextResponse.json({ error: '서버 오류가 발생했습니다.' }, { status: 500 })
   }
@@ -80,8 +80,9 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
 
     return NextResponse.json({ ok: true })
   } catch (e) {
-    if (e instanceof NotFoundError) return NextResponse.json({ error: e.message }, { status: 404 })
-    if (e instanceof ForbiddenError) return NextResponse.json({ error: e.message }, { status: 403 })
+    if (e instanceof NotFoundError || e instanceof ForbiddenError) {
+      return NextResponse.json({ error: e.message }, { status: httpStatusFromError(e) })
+    }
     console.error('DELETE /api/community/posts/[postId]/comments/[commentId] 에러:', e)
     return NextResponse.json({ error: '서버 오류가 발생했습니다.' }, { status: 500 })
   }

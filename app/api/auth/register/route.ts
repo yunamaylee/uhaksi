@@ -35,9 +35,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: '인증 이메일을 발송했습니다.' })
   } catch (e) {
     if (e instanceof ValidationError) {
-      return NextResponse.json({ error: e.message }, { status: 400 })
+      return NextResponse.json({ error: e.message }, { status: httpStatusFromError(e) })
     }
     console.error('POST /api/auth/register 에러:', e)
-    return NextResponse.json({ error: '서버 오류가 발생했습니다.' }, { status: httpStatusFromError(e) })
+    return NextResponse.json({ error: '서버 오류가 발생했습니다.' }, { status: 500 })
   }
 }

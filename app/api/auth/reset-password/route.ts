@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { resetPassword } from '@/lib/services/user'
-import { ValidationError } from '@/lib/services/errors'
+import { ValidationError, httpStatusFromError } from '@/lib/services/errors'
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: '비밀번호가 변경됐어요. 로그인해주세요.' })
   } catch (e) {
     if (e instanceof ValidationError) {
-      return NextResponse.json({ error: e.message }, { status: 400 })
+      return NextResponse.json({ error: e.message }, { status: httpStatusFromError(e) })
     }
     console.error('POST /api/auth/reset-password 에러:', e)
     return NextResponse.json({ error: '서버 오류가 발생했습니다.' }, { status: 500 })

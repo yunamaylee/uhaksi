@@ -59,9 +59,7 @@ export async function upsertExam(params: UpsertExamParams) {
   )
 }
 
-// 시험 삭제 (연관 데이터 먼저 제거)
+// 시험 삭제 (ExamSubject → SubjectRange → Exam 순으로 트랜잭션 처리)
 export async function deleteExam(examId: number): Promise<void> {
-  await examRepo.deleteExamSubjectsByExamId(examId)
-  await examRepo.deleteSubjectRangesByExamId(examId)
-  await examRepo.deleteExamById(examId)
+  await examRepo.deleteExamWithRelations(examId)
 }

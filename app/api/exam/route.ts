@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { upsertExam, deleteExam, NotFoundError } from '@/lib/services/exam'
+import { httpStatusFromError } from '@/lib/services/errors'
 
 export async function POST(request: NextRequest) {
   try {
@@ -28,7 +29,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(exam)
   } catch (e) {
     if (e instanceof NotFoundError) {
-      return NextResponse.json({ error: e.message }, { status: 404 })
+      return NextResponse.json({ error: e.message }, { status: httpStatusFromError(e) })
     }
     console.error('POST /api/exam 에러:', e)
     return NextResponse.json({ error: '서버 오류가 발생했습니다.' }, { status: 500 })
